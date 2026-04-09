@@ -7,7 +7,6 @@ import os
 PASSWORD_FILE = "password.hash"
 SECRET_FILE = "totp.secret"
 
-# Load or generate a persistent TOTP secret
 if os.path.exists(SECRET_FILE):
     with open(SECRET_FILE, "r") as f:
         secret = f.read().strip()
@@ -17,7 +16,6 @@ else:
         f.write(secret)
 
 totp = pyotp.TOTP(secret)
-
 attempts = 0
 locked_until = 0
 
@@ -36,12 +34,10 @@ root.bind("<Alt-F4>", lambda e: "break")
 frame = tk.Frame(root)
 frame.pack(expand=True)
 
-
 def save_password(password):
     hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
     with open(PASSWORD_FILE, "wb") as f:
         f.write(hashed)
-
 
 def load_password():
     if os.path.exists(PASSWORD_FILE):
@@ -49,14 +45,29 @@ def load_password():
             return f.read()
     return None
 
+def make_show_toggle(entry):
+    """Creates a Show/Hide button linked to the given entry widget."""
+    def toggle():
+        if entry.cget("show") == "*":
+            entry.config(show="")
+            btn.config(text="Hide")
+        else:
+            entry.config(show="*")
+            btn.config(text="Show")
+    btn = tk.Button(frame, text="Show", command=toggle, font=("Arial", 11))
+    btn.pack(pady=2)
+    return btn
 
 def setup_password_screen():
     for widget in frame.winfo_children():
         widget.destroy()
 
     tk.Label(frame, text="Set Your Password", font=("Arial", 20)).pack(pady=20)
+
     entry = tk.Entry(frame, show="*", font=("Arial", 16))
     entry.pack(pady=10)
+    make_show_toggle(entry)
+
     msg = tk.Label(frame, text="", fg="red")
     msg.pack()
 
@@ -66,18 +77,20 @@ def setup_password_screen():
             msg.config(text="Password too short! (min 8 chars)")
             return
         save_password(password)
-        login_screen(load_password())  # go directly to login
+        login_screen(load_password())
 
-    tk.Button(frame, text="Save Password", command=save).pack(pady=10)
-
+    tk.Button(frame, text="Save Password", command=save, font=("Arial", 13)).pack(pady=10)
 
 def login_screen(stored_password):
     for widget in frame.winfo_children():
         widget.destroy()
 
     tk.Label(frame, text="Enter Password", font=("Arial", 20)).pack(pady=20)
+
     password_entry = tk.Entry(frame, show="*", font=("Arial", 16))
     password_entry.pack(pady=10)
+    make_show_toggle(password_entry)
+
     message = tk.Label(frame, text="", fg="red")
     message.pack()
 
@@ -89,12 +102,12 @@ def login_screen(stored_password):
             message.config(text=f"Locked! Try again in {remaining}s")
             return
         else:
-            attempts = 0  # reset after lockout expires
+            attempts = 0
 
         entered = password_entry.get()
 
         if bcrypt.checkpw(entered.encode(), stored_password):
-            attempts = 0  # reset on success
+            attempts = 0
             show_otp_screen()
         else:
             attempts += 1
@@ -103,8 +116,7 @@ def login_screen(stored_password):
                 locked_until = time.time() + 30
                 message.config(text="Too many attempts! Locked 30s")
 
-    tk.Button(frame, text="Login", command=check_password).pack(pady=10)
-
+    tk.Button(frame, text="Login", command=check_password, font=("Arial", 13)).pack(pady=10)
 
 def show_otp_screen():
     for widget in frame.winfo_children():
@@ -114,19 +126,20 @@ def show_otp_screen():
     tk.Label(frame, text=f"Your secret (share with authenticator app):\n{secret}",
              font=("Arial", 10), fg="gray").pack(pady=5)
 
-    otp_entry = tk.Entry(frame, font=("Arial", 16))
+    otp_entry = tk.Entry(frame, show="*", font=("Arial", 16))
     otp_entry.pack(pady=10)
+    make_show_toggle(otp_entry)
+
     msg = tk.Label(frame, text="", fg="red")
     msg.pack()
 
     def verify():
-        if totp.verify(otp_entry.get()):  # handles window expiry correctly
+        if totp.verify(otp_entry.get()):
             root.destroy()
         else:
             msg.config(text="Invalid OTP")
 
-    tk.Button(frame, text="Verify", command=verify).pack(pady=10)
-
+    tk.Button(frame, text="Verify", command=verify, font=("Arial", 13)).pack(pady=10)
 
 stored_password = load_password()
 if stored_password is None:
